@@ -1,13 +1,20 @@
 var Twit = require('twit');
 var async = require('async');
 var request = require('request');
-var requestUrl = 'https://medium.com/@shahyash/follow-list?listType=followers&page=';
+var Appbase = require('appbase-js');
+var requestUrl = 'https://medium.com/@shahyash/follow-list?listType=followers&page=0';
 var mediumAccessToken = '28a3095eb492b393e51092223f51b75222bc6146fd9cb08cd35e5c89fad4d3556';
 var twitterAccessToken = '2311820418-XSsBD3Ne6zSVl6F5uXWiiDK3pEhu8Fz7XkXOXfq';
 var twitterAccessToken_secret = 'ozRipDcytwepoLtEC5FMe154Ix76zJNo2wyeyVsGMo9hg';
 var twitterConsumer_key = 'DPjfGKsisymDnWV69thx2FhXI';
 var twitterConsumer_secret = 'Dy9sjEwforlZdiVmSYBs9MOyXeLYfJMwVj68AuDaszPzWQfJcG';
-var pageCount = 0;
+
+var appbaseRef = new Appbase({
+    url: 'https://scalr.api.appbase.io',
+    appname: 'medium-to-twitter',
+    username: 'NZ5hisiMX',
+    password: '29dff771-5de3-4c9c-9df8-70d350faa3a4'
+});
 var makeRequest = function(URL, callback) {
     // console.log("Inside")
     request({
@@ -34,12 +41,7 @@ var makeRequest = function(URL, callback) {
                     }
                     return follower.twitterScreenName;
                 });
-                if (followers.length > 0) {
-                    console.log(followers)
-                    pageCount = pageCount + 1
-                    makeRequest(requestUrl + pageCount)
-                    console.log(requestUrl + pageCount)
-                }
+                saveToDatabase(followers)
             } else {
                 callback({
                     'error': 'no followers'
@@ -54,8 +56,27 @@ var makeRequest = function(URL, callback) {
         }
     });
 };
-var saveToDatabase = function(followers, callback) {
+var saveToDatabase = function(follower) {
+    followers.map(function(object) {
+        if (object) {
+            var jsonObject = {
+                twitterHandle: object
+            }
+            appbaseRef.index({
+                type: 'followers',
+                id: object,
+                body: jsonObject
+            }).on('data', function(response) {
+                if (response.created) {
+                    console.log(object);
+                    sendTweetToFollower(object)
+                }
+            }).on('error', function(error) {
+                console.log(error);
+            });
+        }
 
+    })
 };
 var sendTweetToFollower = function(twitterUsername) {
     var T = new Twit({
@@ -76,21 +97,4 @@ var sendTweetToFollower = function(twitterUsername) {
 
 };
 
-makeRequest(requestUrl + pageCount, function(error, followers) {
-    if (error) {
-        done(error);
-    } else {
-        console.log("Make Request")
-            // this.saveToDatabase(followers, function(err) {
-            //     if (err) {
-            //         done(error);
-            //     }
-            //     this.sendTweetToFollower(function(err) {
-            //         if (err) {
-            //             done(error);
-            //         }
-            //         done(null, 'OK');
-            //     });
-            // });
-    }
-});
+makeRequest(requestUrl)
